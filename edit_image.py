@@ -1,9 +1,9 @@
 from PIL.Image import Image
-from functools import reduce
 
 
 class EditImage(object):
     new_data = []
+
     def __init__(self, img, background_color=(255, 255, 255, 255), perimeter_points=None, probe_points=None):
         if not isinstance(img, Image):
             raise AttributeError("Must pass an Image object as first argument")
@@ -65,10 +65,10 @@ class EditImage(object):
 
     def get_perimeters(self):
         found_perimeters = []
-        for point in self.perimeter_points:
+        for point in self.probe_points:
             starting_points = {}
             for direction in ["left", "right", "up", "down"]:
-                points, perimeter_check = self.get_direction_points(direction, point)
+                points = self.get_direction_points(direction, point)
                 starting_points[direction] = points
             min_points = (None, float('inf'))
             for k, v in starting_points.items():
@@ -95,11 +95,11 @@ class EditImage(object):
         s_points = [(point[0] + x1, point[1] + y1)
                     for x1, y1 in ((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1))]
 
-        def sum_background_pixels(count, s_point):
+        def sum_background_pixels(s_point):
             item = self.image.getpixel(s_point)
-            return count + (1 if item == self.background_color else 0)
+            return 1 if item == self.background_color else 0
 
-        return reduce(sum_background_pixels, s_points)
+        return sum(map(sum_background_pixels, s_points))
 
     @staticmethod
     def connect_points(points):
@@ -167,7 +167,7 @@ class EditImage(object):
             if not in_perimeter:
                 break
             in_perimeter = False
-            axis = list(filter((lambda val: val > point[index] == gt),
+            axis = list(filter((lambda val: bool(val > point[index]) == gt),
                                color_points.keys() if index == 1 else color_points.get(y, [])))
             for val2 in axis:
                 p = [None, None]
@@ -211,19 +211,19 @@ class EditImage(object):
             for x in range(0, width):
                 point = (x, y)
                 item = self.image.getpixel(point)
-                if y in background_points and x in background_points[y]:
+                if item == self.background_color:
                     background = True
-                    for perimeter in found_perimeters:
-                        if self.in_perimeter(point, color_points, perimeter):
-                            background = False
-                            break
+                    if y in background_points and x in background_points[y]:
+                        for perimeter in found_perimeters:
+                            if self.in_perimeter(point, color_points, perimeter):
+                                background = False
+                                break
                     if background:
                         data.append(new_background)
                     else:
                         data.append(item)
                 else:
                     data.append(item)
-
         return data
 
     def change_background(self, background_color=(255, 255, 255, 0)):
@@ -231,8 +231,6 @@ class EditImage(object):
         new_data = self.get_new_data(found_perimeters, background_color)
         self.new_data = new_data
         self.image.putdata(new_data)
-        self.image.save('/Users/jgriff/Documents/web_projects/statdive_django/media/teams/franchise_logos/test_CHI1.png',
-                        "PNG")
 
     def save(self, path, file_format="PNG"):
         self.image.save(path, file_format)
